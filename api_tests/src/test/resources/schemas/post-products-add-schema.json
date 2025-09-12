@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POST /products/add response schema",
+  "type": "object",
+  "required": ["id", "title", "price", "stock"],
+  "properties": {
+    "id": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string" },
+    "price": { "type": ["number", "integer"], "minimum": 0 },
+    "stock": { "type": "integer", "minimum": 0 },
+
+    "description": { "type": ["string", "null"] },
+    "brand": { "type": ["string", "null"] },
+    "category": { "type": ["string", "null"] },
+    "thumbnail": { "type": ["string", "null"] },
+    "images": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

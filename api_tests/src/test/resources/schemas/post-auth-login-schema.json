@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POST /auth/login response schema",
+  "type": "object",
+  "required": [
+    "accessToken",
+    "refreshToken",
+    "id",
+    "username",
+    "email",
+    "firstName",
+    "lastName",
+    "gender",
+    "image"
+  ],
+  "properties": {
+    "accessToken": { "type": "string", "minLength": 10 },
+    "refreshToken": { "type": "string", "minLength": 10 },
+    "id": { "type": "integer", "minimum": 1 },
+    "username": { "type": "string" },
+    "email": { "type": "string", "format": "email" },
+    "firstName": { "type": "string" },
+    "lastName": { "type": "string" },
+    "gender": { "type": "string" },
+    "image": { "type": "string", "format": "uri" }
+  },
+  "additionalProperties": true
+}

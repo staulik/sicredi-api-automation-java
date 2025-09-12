@@ -1,0 +1,5 @@
+[
+  { "title": "Produto Massa Externa 1", "price": 99.9, "stock": 5 },
+  { "title": "Produto Massa Externa 2", "price": 200.5, "stock": 10 },
+  { "title": "Produto Massa Externa 3", "price": 13.0, "stock": 0 }
+]
