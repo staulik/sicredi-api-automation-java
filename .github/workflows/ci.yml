@@ -25,7 +25,7 @@ jobs:
       - name: Setup Gradle (cache)
         uses: gradle/actions/setup-gradle@v4
 
-      # Roda testes; mesmo falhando, segue adiante para gerar o Allure
+      # Roda testes; mesmo com falha, segue (pra sempre termos allure-results)
       - name: Run tests (generate allure-results)
         working-directory: api_tests
         continue-on-error: true
@@ -33,12 +33,13 @@ jobs:
           gradle --version
           gradle clean test
 
-      # Lista saídas para debug rápido
+      # Debug rápido pra ver o que foi gerado
       - name: List build outputs (debug)
         run: |
-          echo "allure-results:" && ls -la api_tests/build/allure-results || true
+          echo "Gradle report dir:" && ls -la api_tests/build/reports/tests/test || true
+          echo "Allure results dir:" && ls -la api_tests/build/allure-results || true
 
-      # Gera o Allure HTML se houver resultados
+      # Gera o Allure HTML somente se houver results
       - name: Generate Allure Report
         if: ${{ hashFiles('api_tests/build/allure-results/**') != '' }}
         uses: simple-elf/allure-report-action@v1
@@ -46,7 +47,7 @@ jobs:
           allure_results: api_tests/build/allure-results
           allure_report:  api_tests/build/allure-report
 
-      # Faz upload do relatório HTML como artifact para download
+      # Artifact 1: Allure HTML (index.html dentro)
       - name: Upload Allure HTML
         if: ${{ hashFiles('api_tests/build/allure-report/**') != '' }}
         uses: actions/upload-artifact@v4
@@ -55,7 +56,16 @@ jobs:
           path: api_tests/build/allure-report
           retention-days: 7
 
-      # Sempre guarda os brutos para inspeção
+      # Artifact 2: Relatório Padrão do Gradle (index.html)
+      - name: Upload Gradle HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-report
+          path: api_tests/build/reports/tests/test
+          retention-days: 7
+
+      # Artifact 3: brutos pra debug (JUnit/XML, HTML do Gradle e allure-results)
       - name: Upload raw artifacts (JUnit/HTML/allure-results)
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,5 +75,7 @@ jobs:
             api_tests/build/test-results/test/
             api_tests/build/reports/tests/test/
             api_tests/build/allure-results/
+          retention-days: 7
+
 
 
