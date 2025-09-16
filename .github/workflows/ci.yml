@@ -1,4 +1,4 @@
-name: CI - API Tests (Gradle + Allure)
+name: CI - API Tests (SICREDI)
 
 on:
   push:
@@ -13,9 +13,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api_tests
 
     steps:
       - name: Checkout
@@ -30,14 +27,35 @@ jobs:
       - name: Setup Gradle (cache)
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Gradle version
-        run: gradle --version
-
       - name: Run tests (generate allure-results)
+        working-directory: api_tests
         run: |
+          gradle --version
           gradle clean test -Dallure.results.directory=build/allure-results
 
-      - name: Upload raw artifacts (JUnit, Gradle HTML, allure-results)
+      # Diagnóstico: mostra se gerou allure-results
+      - name: List allure results
+        run: |
+          ls -la
+          ls -la api_tests || true
+          ls -la api_tests/build || true
+          ls -la api_tests/build/allure-results || true
+
+      # Gera o Allure Report
+      - name: Generate Allure Report
+        uses: simple-elf/allure-report-action@v1
+        with:
+          allure_results: api_tests/build/allure-results
+          report_path: api_tests/build/allure-report
+
+      # Falha cedo se o relatório não existir
+      - name: Verify Allure report
+        run: |
+          test -d api_tests/build/allure-report
+          echo "Allure report OK"
+
+      # Guarda artefatos crus (útil pra debugar)
+      - name: Upload raw artifacts (JUnit/HTML/allure-results)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -47,14 +65,7 @@ jobs:
             api_tests/build/reports/tests/test/
             api_tests/build/allure-results/
 
-      # Gera o Allure Report usando action pronta
-      - name: Generate Allure Report
-        uses: simple-elf/allure-report-action@v1
-        with:
-          allure_results: api_tests/build/allure-results
-          report_path: api_tests/build/allure-report
-
-      # Prepara o Allure para o GitHub Pages
+      # Prepara o pacote do GitHub Pages
       - name: Upload Pages artifact (Allure)
         if: always()
         uses: actions/upload-pages-artifact@v3
@@ -64,7 +75,10 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: always()   # publica mesmo se testes falharem, igual a 'artifacts: when: always'
+    if: always()
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -72,3 +86,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
