@@ -13,6 +13,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check_results.outputs.exists }}
 
     steps:
       - name: Checkout
@@ -35,25 +37,30 @@ jobs:
 
       - name: List build outputs (debug)
         run: |
-          echo "Root:"
-          ls -la
-          echo "api_tests:"
-          ls -la api_tests || true
-          echo "build:"
-          ls -la api_tests/build || true
-          echo "allure-results:"
-          ls -la api_tests/build/allure-results || true
+          echo "Root:" && ls -la
+          echo "api_tests:" && ls -la api_tests || true
+          echo "build:" && ls -la api_tests/build || true
+          echo "allure-results:" && ls -la api_tests/build/allure-results || true
 
-      # Só gera o Allure se houver results
+      # Checa se existem resultados do Allure e expõe saída para o job
+      - name: Check allure-results
+        id: check_results
+        run: |
+          if [ -d "api_tests/build/allure-results" ] && [ -n "$(ls -A api_tests/build/allure-results || true)" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate Allure Report
-        if: ${{ hashFiles('api_tests/build/allure-results/**') != '' }}
+        if: ${{ steps.check_results.outputs.exists == 'true' }}
         uses: simple-elf/allure-report-action@v1
         with:
           allure_results: api_tests/build/allure-results
           report_path: api_tests/build/allure-report
 
       - name: Verify Allure report
-        if: ${{ hashFiles('api_tests/build/allure-results/**') != '' }}
+        if: ${{ steps.check_results.outputs.exists == 'true' }}
         run: |
           test -d api_tests/build/allure-report
           echo "Allure report OK"
@@ -68,9 +75,8 @@ jobs:
             api_tests/build/reports/tests/test/
             api_tests/build/allure-results/
 
-      # Só prepara Pages se o relatório existir
       - name: Upload Pages artifact (Allure)
-        if: ${{ hashFiles('api_tests/build/allure-report/**') != '' }}
+        if: ${{ steps.check_results.outputs.exists == 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: api_tests/build/allure-report
@@ -78,7 +84,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ always() && hashFiles('api_tests/build/allure-report/**') != '' }}
+    if: ${{ needs.test.outputs.should_deploy == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -86,5 +92,6 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
 
 
