@@ -7,14 +7,10 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    outputs:
-      should_deploy: ${{ steps.check_results.outputs.exists }}
 
     steps:
       - name: Checkout
@@ -29,48 +25,37 @@ jobs:
       - name: Setup Gradle (cache)
         uses: gradle/actions/setup-gradle@v4
 
-      # Roda testes e NÃO falha o job se houver testes falhando
+      # Roda testes; mesmo falhando, segue adiante para gerar o Allure
       - name: Run tests (generate allure-results)
         working-directory: api_tests
         continue-on-error: true
         run: |
           gradle --version
-          gradle clean test -Dallure.results.directory=build/allure-results
+          gradle clean test
 
-      # Debug: mostra o que saiu da build
+      # Lista saídas para debug rápido
       - name: List build outputs (debug)
         run: |
-          echo "Root:" && ls -la
-          echo "api_tests:" && ls -la api_tests || true
-          echo "build:" && ls -la api_tests/build || true
           echo "allure-results:" && ls -la api_tests/build/allure-results || true
 
-      # Checa se existem results do Allure e exporta flag
-      - name: Check allure-results
-        id: check_results
-        run: |
-          if [ -d "api_tests/build/allure-results" ] && [ -n "$(ls -A api_tests/build/allure-results || true)" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Gera o Allure se houver results
+      # Gera o Allure HTML se houver resultados
       - name: Generate Allure Report
-        if: ${{ steps.check_results.outputs.exists == 'true' }}
+        if: ${{ hashFiles('api_tests/build/allure-results/**') != '' }}
         uses: simple-elf/allure-report-action@v1
         with:
           allure_results: api_tests/build/allure-results
-          report_path: api_tests/build/allure-report
+          allure_report:  api_tests/build/allure-report
 
-      # Verifica o relatório
-      - name: Verify Allure report
-        if: ${{ steps.check_results.outputs.exists == 'true' }}
-        run: |
-          test -d api_tests/build/allure-report
-          echo "Allure report OK"
+      # Faz upload do relatório HTML como artifact para download
+      - name: Upload Allure HTML
+        if: ${{ hashFiles('api_tests/build/allure-report/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: api_tests/build/allure-report
+          retention-days: 7
 
-      # Guarda artefatos (útil para investigar falhas)
+      # Sempre guarda os brutos para inspeção
       - name: Upload raw artifacts (JUnit/HTML/allure-results)
         if: always()
         uses: actions/upload-artifact@v4
@@ -81,22 +66,4 @@ jobs:
             api_tests/build/reports/tests/test/
             api_tests/build/allure-results/
 
-      # Sobe artefato do Pages SÓ se o relatório existir
-      - name: Upload Pages artifact (Allure)
-        if: ${{ steps.check_results.outputs.exists == 'true' }}
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: api_tests/build/allure-report
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: ${{ needs.test.outputs.should_deploy == 'true' }}
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
 
