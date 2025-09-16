@@ -13,9 +13,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    outputs:
-      allure_exists: ${{ steps.check.outputs.allure }}
-      gradle_exists: ${{ steps.check.outputs.gradle }}
 
     steps:
       - name: Checkout
@@ -38,41 +35,21 @@ jobs:
           gradle --version
           gradle clean test
 
-      - name: List build outputs (debug)
-        run: |
-          echo "Gradle report dir:" && ls -la api_tests/build/reports/tests/test || true
-          echo "Allure results dir:" && ls -la api_tests/build/allure-results || true
-
-      # Verifica se existem resultados para cada relatório
-      - name: Check reports presence
-        id: check
-        run: |
-          if [ -d "api_tests/build/allure-results" ] && [ -n "$(ls -A api_tests/build/allure-results || true)" ]; then
-            echo "allure=true" >> $GITHUB_OUTPUT
-          else
-            echo "allure=false" >> $GITHUB_OUTPUT
-          fi
-          if [ -d "api_tests/build/reports/tests/test" ] && [ -n "$(ls -A api_tests/build/reports/tests/test || true)" ]; then
-            echo "gradle=true" >> $GITHUB_OUTPUT
-          else
-            echo "gradle=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Gera o Allure HTML somente se houver results
+      # Gera Allure HTML se houver resultados
       - name: Generate Allure Report
-        if: ${{ steps.check.outputs.allure == 'true' }}
+        if: ${{ hashFiles('api_tests/build/allure-results/**') != '' }}
         uses: simple-elf/allure-report-action@v1
         with:
           allure_results: api_tests/build/allure-results
           allure_report:  api_tests/build/allure-report
 
-      # Prepara o "site" com os relatórios disponíveis
+      # Monta site com Allure + Relatório Padrão (Gradle)
       - name: Build Pages site (Allure + Gradle)
         run: |
           set -e
           rm -rf site
           mkdir -p site
-          # Copia Allure se existir
+          # Allure (se existir)
           if [ -d "api_tests/build/allure-report" ]; then
             mkdir -p site/allure-report
             cp -r api_tests/build/allure-report/* site/allure-report/
@@ -80,7 +57,7 @@ jobs:
           else
             ALLURE_LINK=''
           fi
-          # Copia Relatório Padrão (Gradle) se existir
+          # Relatório padrão do Gradle (sempre existe se testes rodaram)
           if [ -d "api_tests/build/reports/tests/test" ]; then
             mkdir -p site/gradle-report
             cp -r api_tests/build/reports/tests/test/* site/gradle-report/
@@ -88,14 +65,11 @@ jobs:
           else
             GRADLE_LINK=''
           fi
-          # Cria um index juntando tudo
+          # index.html
           cat > site/index.html <<EOF
           <!doctype html>
           <html lang="pt-br">
-          <head>
-            <meta charset="utf-8"/>
-            <title>Relatórios - Sicredi API Tests</title>
-          </head>
+          <head><meta charset="utf-8"/><title>Relatórios - Sicredi API Tests</title></head>
           <body>
             <h1>Relatórios - Sicredi API Tests</h1>
             <ul>
@@ -106,10 +80,12 @@ jobs:
           </body>
           </html>
           EOF
-          echo "=== Site pronto ==="
-          find site -maxdepth 2 -type f -name index.html -print
 
-      # Publica o "site" no GitHub Pages (sempre terá pelo menos um index.html)
+      # Configura Pages (recomendado)
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      # Empacota o site para o Pages
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -125,4 +101,5 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
 
