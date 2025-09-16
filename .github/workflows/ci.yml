@@ -1,0 +1,74 @@
+name: CI - API Tests (Gradle + Allure)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api_tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle (cache)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Gradle version
+        run: gradle --version
+
+      - name: Run tests (generate allure-results)
+        run: |
+          gradle clean test -Dallure.results.directory=build/allure-results
+
+      - name: Upload raw artifacts (JUnit, Gradle HTML, allure-results)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            api_tests/build/test-results/test/
+            api_tests/build/reports/tests/test/
+            api_tests/build/allure-results/
+
+      # Gera o Allure Report usando action pronta
+      - name: Generate Allure Report
+        uses: simple-elf/allure-report-action@v1
+        with:
+          allure_results: api_tests/build/allure-results
+          report_path: api_tests/build/allure-report
+
+      # Prepara o Allure para o GitHub Pages
+      - name: Upload Pages artifact (Allure)
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: api_tests/build/allure-report
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()   # publica mesmo se testes falharem, igual a 'artifacts: when: always'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
