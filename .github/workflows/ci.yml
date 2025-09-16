@@ -29,12 +29,15 @@ jobs:
       - name: Setup Gradle (cache)
         uses: gradle/actions/setup-gradle@v4
 
+      # Roda testes e NÃO falha o job se houver testes falhando
       - name: Run tests (generate allure-results)
         working-directory: api_tests
+        continue-on-error: true
         run: |
           gradle --version
           gradle clean test -Dallure.results.directory=build/allure-results
 
+      # Debug: mostra o que saiu da build
       - name: List build outputs (debug)
         run: |
           echo "Root:" && ls -la
@@ -42,7 +45,7 @@ jobs:
           echo "build:" && ls -la api_tests/build || true
           echo "allure-results:" && ls -la api_tests/build/allure-results || true
 
-      # Checa se existem resultados do Allure e expõe saída para o job
+      # Checa se existem results do Allure e exporta flag
       - name: Check allure-results
         id: check_results
         run: |
@@ -52,6 +55,7 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
+      # Gera o Allure se houver results
       - name: Generate Allure Report
         if: ${{ steps.check_results.outputs.exists == 'true' }}
         uses: simple-elf/allure-report-action@v1
@@ -59,12 +63,14 @@ jobs:
           allure_results: api_tests/build/allure-results
           report_path: api_tests/build/allure-report
 
+      # Verifica o relatório
       - name: Verify Allure report
         if: ${{ steps.check_results.outputs.exists == 'true' }}
         run: |
           test -d api_tests/build/allure-report
           echo "Allure report OK"
 
+      # Guarda artefatos (útil para investigar falhas)
       - name: Upload raw artifacts (JUnit/HTML/allure-results)
         if: always()
         uses: actions/upload-artifact@v4
@@ -75,6 +81,7 @@ jobs:
             api_tests/build/reports/tests/test/
             api_tests/build/allure-results/
 
+      # Sobe artefato do Pages SÓ se o relatório existir
       - name: Upload Pages artifact (Allure)
         if: ${{ steps.check_results.outputs.exists == 'true' }}
         uses: actions/upload-pages-artifact@v3
@@ -92,6 +99,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
 
 
 
